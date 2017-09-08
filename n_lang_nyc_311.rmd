@@ -1,0 +1,71 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+
+Load packages.
+
+Either require(package.name) or library(package.name) will work. 
+
+```{r}
+require(tidyverse)
+require(cowplot)
+library(viridis)
+require(lubridate)
+```
+
+
+
+```{r}
+raw.data <- read_csv(file = "filtered_2015_311_data_10per.csv", col_names = TRUE)
+raw.data <- raw.data %>% 
+  arrange(`Unique Key`)
+
+raw.data %>% 
+  ggplot(aes(x = Longitude, y = Latitude)) +
+  geom_point() #+
+  #theme(axis.text.x = element_blank(), axis.text.y = element_blank())
+
+raw.data %>%
+  filter(Latitude < 40.0)
+
+raw.data[which(Longtitude < -75), which(Latitude < 39.5)]
+
+raw.data[which(raw.data$Longitude < -75), 15:16]
+raw.data[which(raw.data$Longitude < -75), 
+         which(colnames(raw.data) == "Latitude"):which(colnames(raw.data) == "Longitude")]
+
+raw.data[which(raw.data$Longitude < -75), 15:16] <- c(NA, NA)
+
+raw.data %>%
+  filter(Latitude < 40.0)
+
+raw.data %>%
+  filter(Longitude < -75)
+
+#raw.data$Longitude <- abs(as.numeric(raw.data$Longitude))
+
+raw.data %>% 
+  ggplot(aes(x = Longitude, y = Latitude)) +
+  geom_point()
+
+map.base <- raw.data %>%
+  ggplot(aes(x = Longitude, y = Latitude))
+
+map.base +
+  geom_point()
+
+map.base +
+  geom_bin2d(bins = 200) +
+  scale_fill_viridis(option = "C")
+
+```
+
+http://www.cookbook-r.com/Graphs/
+http://r-statistics.co/Top50-Ggplot2-Visualizations-MasterList-R-Code.html
+http://www.sthda.com/english/wiki/ggplot2-essentials
+
