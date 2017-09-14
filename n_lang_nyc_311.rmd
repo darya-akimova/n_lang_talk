@@ -1,5 +1,5 @@
 ---
-title: "Untitled"
+title: "Intro to R with NYC 311 Data"
 output: html_document
 ---
 
@@ -7,63 +7,213 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE, message = FALSE)
 ```
 
+This is an R Markdown file.
+
+Useful resources for R Markdown and Knitr:
+http://rmarkdown.rstudio.com/
+https://www.rstudio.com/resources/cheatsheets/
+
 Load packages.
 
 Either require(package.name) or library(package.name) will work. 
 
 ```{r}
-require(tidyverse)
-require(cowplot)
+library(tidyverse)
+library(cowplot)
 library(viridis)
-require(lubridate)
+library(lubridate) 
+library(stringr)
 ```
 
+Note the warnings as some functions are masked as one package after the other is loaded. If there is an issue with a masked function, call it by package name: package_name::function().
 
+To get help at any point, type: ?package_name or ?function_name to console to bring up the help.
+
+
+### Data import:
+- read_csv() is part of the readr package, and will import the data as a tibble
+- read.csv() is bart of base r and will import the data as a data.frame
 
 ```{r}
-raw.data <- read_csv(file = "filtered_2015_311_data_10per.csv", col_names = TRUE)
-raw.data <- raw.data %>% 
-  arrange(`Unique Key`)
-
-raw.data %>% 
-  ggplot(aes(x = Longitude, y = Latitude)) +
-  geom_point() #+
-  #theme(axis.text.x = element_blank(), axis.text.y = element_blank())
-
-raw.data %>%
-  filter(Latitude < 40.0)
-
-raw.data[which(Longtitude < -75), which(Latitude < 39.5)]
-
-raw.data[which(raw.data$Longitude < -75), 15:16]
-raw.data[which(raw.data$Longitude < -75), 
-         which(colnames(raw.data) == "Latitude"):which(colnames(raw.data) == "Longitude")]
-
-raw.data[which(raw.data$Longitude < -75), 15:16] <- c(NA, NA)
-
-raw.data %>%
-  filter(Latitude < 40.0)
-
-raw.data %>%
-  filter(Longitude < -75)
-
-#raw.data$Longitude <- abs(as.numeric(raw.data$Longitude))
-
-raw.data %>% 
-  ggplot(aes(x = Longitude, y = Latitude)) +
-  geom_point()
-
-map.base <- raw.data %>%
-  ggplot(aes(x = Longitude, y = Latitude))
-
-map.base +
-  geom_point()
-
-map.base +
-  geom_bin2d(bins = 200) +
-  scale_fill_viridis(option = "C")
-
+call.data <- read_csv(file = "311service_2015calls_10per.csv", col_names = TRUE)
+call.data <- call.data %>% 
+  arrange(desc(`Unique Key`))
+call.data
+vrbl.names <- str_to_lower(colnames(call.data))
+vrbl.names <- gsub(" ", ".", vrbl.names)
+colnames(call.data) <- vrbl.names
+call.data
+rm(vrbl.names)
 ```
+
+rm(list=ls()) will all variables in the global environment.
+
+```{r}
+# which variables have missing values?
+sapply(call.data, anyNA)
+# how to check how many missing values in one column?
+sum(is.na(call.data$closed.date))
+sum(is.na(call.data$closed.date)) / nrow(call.data) * 100
+
+# which agencies respond to 311 service calls?
+sort(unique(call.data$agency))
+length(unique(call.data$agency))
+length(unique(call.data$agency.name))
+head(unique(call.data$agency.name), n = 20)
+
+call.data %>%
+  select(agency:agency.name) %>%
+  mutate(combo = paste(agency, agency.name, sep = " / ")) %>%
+  group_by(combo) %>%
+  summarise(unq = n()) %>%
+  #arrange(combo) %>%
+  arrange(desc(unq)) %>%
+  head(n = 20)
+  #ggplot(aes(x = unq)) +
+  #geom_histogram(bins = 100)
+
+ggplot(data = call.data, aes(x = agency)) +
+  geom_bar(stat = "count")
+
+call.data %>%
+  group_by(agency) %>%
+  summarise(agency.total = n()) %>%
+  arrange(desc(agency.total)) %>%
+  ggplot(aes(x = agency, y = agency.total)) +
+  geom_bar(stat = "identity")
+
+agency.info <- call.data %>%
+  group_by(agency) %>%
+  summarise(agency.total = n()) %>%
+  arrange(desc(agency.total)) %>%
+  mutate(ord.agency = factor(agency, levels = agency))
+
+agency.info %>%
+  ggplot(aes(x = ord.agency, y = agency.total)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  ylab("Total Number of 311 Calls") +
+  xlab("Agency") +
+  ggtitle("311 Calls by Agency\nYear: 2015")
+```
+
+Where do calls originate?
+
+```{r}
+# plot Lat v Long 
+call.data %>% 
+  ggplot(aes(x = longitude, y = latitude)) + 
+  geom_point()
+plot(call.data$longitude, call.data$latitude, type = "p")
+
+map.base <- call.data %>%
+  ggplot(aes(x = longitude, y = latitude)) +
+  coord_quickmap()
+
+map.base +
+  geom_point()
+
+map.base +
+  geom_point(alpha = 0.2, size = 0.25)
+
+map.base +
+  geom_bin2d(bins = 150) +
+  scale_fill_viridis(option = "D")
+
+map.base +
+  geom_hex(bins = 130) +
+  scale_fill_viridis(option = "D")
+
+call.data %>%
+  ggplot(aes(x = longitude)) +
+  geom_histogram() #+
+  #geom_histogram(aes(y = ..density..), alpha = 0.5) +
+  #geom_density(color = "red", size = 5)
+```
+
+Can we get more useful information relating to location, such as: are certain types of calls more common in different places in NYC?
+
+Six agencies account for 85% of the service calls:
+
+```{r}
+agency.info <- agency.info %>%
+  arrange(desc(agency.total))
+cumsum(agency.info$agency.total) / sum(agency.info$agency.total)
+head(agency.info, n = 7)
+
+top.six <- call.data %>%
+  filter(agency %in% agency.info$agency[1:6]) %>%
+  mutate(agency = factor(agency, levels = agency.info$ord.agency))
+length(unique(top.six$agency))
+unique(top.six$agency)
+
+top.six %>%
+  ggplot(aes(x = longitude, y = latitude, color = agency)) +
+  geom_point(alpha = 0.2) +
+  coord_quickmap()
+
+top.six %>%
+  ggplot(aes(x = longitude, y = latitude)) +
+  geom_point(alpha = 0.2, size = 0.25) +
+  coord_quickmap() +
+  facet_wrap(~agency)
+```
+
+What are they typical HPD complaints?
+
+```{r}
+hpd.calls <- top.six %>%
+  filter(agency == "HPD")
+length(unique(call.data$complaint.type))
+
+call.data %>% 
+  group_by(complaint.type) %>% 
+  summarise(tot = n()) %>% 
+  arrange(desc(tot))
+
+hpd.calls %>%
+  group_by(complaint.type) %>%
+  summarise(tot = n()) %>%
+  arrange(desc(tot))
+
+hpd.calls %>%
+  group_by(descriptor) %>%
+  summarise(tot = n()) %>%
+  arrange(desc(tot))
+```
+
+How does the type of complaint change over the course of the year?
+
+```{r}
+complaints <- call.data %>% 
+  group_by(complaint.type) %>% 
+  summarise(tot = n()) %>% 
+  arrange(desc(tot))
+
+head(call.data$created.date)
+
+pop.comp <- call.data %>%
+  filter(complaint.type %in% complaints$complaint.type[1:6]) %>%
+  separate(created.date, c("date", "time", "tod"), sep = " ") %>%
+  mutate(date = mdy(date))
+
+pop.comp
+
+pop.comp %>%
+  group_by(date) %>%
+  summarise(tot = n()) %>%
+  ggplot(aes(x = date, y = tot)) +
+  geom_point()
+
+pop.comp %>%
+  select(date, complaint.type) %>%
+  group_by(date, complaint.type) %>%
+  mutate(number = n()) %>%
+  distinct() %>%
+  ggplot(aes(x = date, y = number, color = complaint.type, shape = complaint.type)) +
+  geom_point(size = 5)
+```
+
 
 http://www.cookbook-r.com/Graphs/
 http://r-statistics.co/Top50-Ggplot2-Visualizations-MasterList-R-Code.html
