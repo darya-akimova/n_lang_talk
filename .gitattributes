@@ -15,3 +15,5 @@
 *.PDF	 diff=astextplain
 *.rtf	 diff=astextplain
 *.RTF	 diff=astextplain
+*.Rmd linguist-language=R
+2017_09_21_human_redox_elasticnet_model_building_raw_data_noQC.html linguist-vendored=false
